@@ -35,6 +35,13 @@ Máy cần có Internet (giọng đọc của cô lấy từ Microsoft Edge).
      Chỉ mở trang ?view=stage ở MỘT chỗ (LIVE Studio), mở thêm sẽ nghe hai giọng cô đè nhau.
      Dùng OBS: thêm nguồn Browser, cùng đường dẫn và khổ trên.
 
+     CÁCH KHÁC: TÁCH TIẾNG BẰNG VB-CABLE (LIVE Studio chỉ thu tiếng lớp học, mở video khác không lọt vào live)
+       • Cài VB-Cable miễn phí ở vb-audio.com/Cable, khởi động lại máy.
+       • Trang điều khiển → khung "Âm thanh stage (VB-Cable)" → bấm "🪟 Mở cửa sổ stage (Edge)".
+       • Ô "Phát tiếng ra" chọn "CABLE Input" (chưa thấy thì bấm "🔎 Tìm thiết bị"), dòng dưới báo ✅ là được.
+       • LIVE Studio: thêm nguồn "Window capture" chọn cửa sổ Edge đó, thêm mic "CABLE Output",
+         tắt âm thanh máy tính, XOÁ nguồn Link cũ (2 trang stage = 2 giọng cô đè nhau).
+
   5) Kết thúc: bấm "👋 Chào tạm biệt (xuống live)" ở trang điều khiển, rồi tắt live.
      Xem lại buổi live: nút "📊 Báo cáo" hoặc http://localhost:3006/bao-cao
 
@@ -53,4 +60,7 @@ Máy cần có Internet (giọng đọc của cô lấy từ Microsoft Edge).
 
 
 Sổ lớp (điểm, bảng vàng tuần, báo cáo) và cài đặt lưu trong thư mục "data" và file "settings.json" cạnh file .bat.
-Muốn sang bản mới mà giữ sổ lớp: chép thư mục "data" và file "settings.json" sang thư mục bản mới.
+CẬP NHẬT BẢN MỚI: trang điều khiển → khung "Cập nhật" → "🔄 Kiểm tra cập nhật" → có bản mới thì bấm
+"⬇️ Cập nhật lên ..." 2 lần. Game tự tải, tự chép đè, khởi động lại vài giây; sổ lớp, cài đặt, nhạc nền giữ nguyên.
+Nên cập nhật lúc KHÔNG live (tiết đang học sẽ bắt đầu lại).
+Cập nhật tay (hoặc bản cũ chưa có nút này): chép thư mục "data" và file "settings.json" sang thư mục bản mới.

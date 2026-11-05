@@ -78,6 +78,13 @@ Trước khi tắt live, bấm nút **👋 Chào tạm biệt (xuống live)** �
 
 Dùng OBS cũng được: thêm nguồn **Browser**, cùng đường dẫn và khổ trên.
 
+**Cách khác: tách tiếng bằng VB-Cable** (giống game Chánh Điện; LIVE Studio chỉ thu tiếng lớp học, xem video hay nghe nhạc khác trên máy không lọt vào live)
+1. Cài [VB-Cable](https://vb-audio.com/Cable/) (miễn phí), khởi động lại máy.
+2. Trang điều khiển → khung **Âm thanh stage (VB-Cable)** → bấm **🪟 Mở cửa sổ stage (Edge)**: lớp học mở thành cửa sổ Edge riêng khổ 9:16, tự phát tiếng.
+3. Ô **Phát tiếng ra** chọn **CABLE Input** (chưa thấy thì bấm **🔎 Tìm thiết bị**). Dòng bên dưới báo ✅ là được.
+4. Trong LIVE Studio: thêm nguồn **Window capture** chọn cửa sổ đó, thêm mic **CABLE Output**, tắt âm thanh máy tính. Bỏ nguồn Link cũ (2 trang stage cùng mở là 2 giọng cô).
+Thiết bị đã chọn được lưu trong `settings.json`, lần sau mở lại vẫn nhớ.
+
 ## Trang điều khiển
 
 - **Tên lớp**: đổi chữ trên bảng hiệu.
@@ -85,6 +92,8 @@ Dùng OBS cũng được: thêm nguồn **Browser**, cùng đường dẫn và k
 - **Tốc độ giọng**: kéo thanh trượt, có tác dụng ngay khi đang live.
 - **⏭ Qua phần tiếp / 🔄 Ván mới / 🚫 Bỏ câu này**: điều khiển lớp bằng tay. Câu bị bỏ sẽ không bao giờ hỏi lại.
 - **Chúc sinh nhật**, **ra chơi ngay**, **chơi game lớn ngay**, **👋 Chào tạm biệt**.
+- **Âm thanh stage (VB-Cable)**: chọn loa / CABLE Input cho giọng cô, hiệu ứng và nhạc; mở cửa sổ stage bằng Edge.
+- **Cập nhật** (bản zip cho Windows): **🔄 Kiểm tra cập nhật** hỏi GitHub Releases, có bản mới thì bấm **⬇️ Cập nhật lên …** (bấm 2 lần). Game tải về, kiểm SHA-256, chép đè rồi tự khởi động lại vài giây; sổ lớp `data/`, `settings.json` và nhạc nền giữ nguyên, trang đang mở tự tải lại, TikTok tự kết nối lại. Nên cập nhật lúc không live. Mở game lên là tự kiểm tra 1 lần. Chạy từ mã nguồn (`BAT-LIVE.bat`) thì cập nhật bằng `git pull`.
 - Các nút giả lập để thử khi chưa live.
 
 ## Thêm hoặc sửa câu hỏi

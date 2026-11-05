@@ -7,11 +7,16 @@
  * - Lệnh từ trang điều khiển -> trang stage: /api/control
  * - Giọng đọc tiếng Việt: /api/tts (Edge TTS, lỗi thì Google)
  * - Giả lập sự kiện để test không cần live: /api/test/emit
+ * - Chọn loa / VB-Cable cho trang stage: /api/audio/state, /api/open-stage
+ * - Kiểm tra và cài bản cập nhật (bản Windows đóng gói): /api/update/*
  */
 import express from 'express';
 import dotenv from 'dotenv';
 import path from 'path';
 import fs from 'fs';
+import os from 'os';
+import { execFile, spawn } from 'child_process';
+import { createHash } from 'crypto';
 import { fileURLToPath } from 'url';
 import { TikTokLiveConnection, WebcastEvent, ControlEvent } from 'tiktok-live-connector';
 import { MsEdgeTTS, OUTPUT_FORMAT } from 'msedge-tts';
@@ -75,7 +80,8 @@ const SETTINGS_FILE = path.join(__dirname, 'settings.json');
 let lastNameControl: { action: string; text: string } | null = null;
 // tài khoản TikTok đang cần giữ kết nối: rớt thì tự kết nối lại, tắt server bật lại cũng tự kết nối
 let wantUser = '';
-let settings: { channelName?: string; tiktokUser?: string } = {};
+// audioOut: tên thiết bị phát tiếng của trang stage, vd "CABLE Input" của VB-Cable ('' = loa mặc định)
+let settings: { channelName?: string; tiktokUser?: string; audioOut?: string } = {};
 try {
   settings = JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf8'));
   if (typeof settings.channelName === 'string' && settings.channelName.trim()) {
@@ -113,6 +119,11 @@ app.get('/api/tiktok/events', (req, res) => {
   res.write(`event: status\ndata: ${JSON.stringify(liveStats)}\n\n`);
   if (lastRateControl) res.write(`event: control\ndata: ${JSON.stringify(lastRateControl)}\n\n`);
   if (lastNameControl) res.write(`event: control\ndata: ${JSON.stringify(lastNameControl)}\n\n`);
+  if (settings.audioOut) res.write(`event: control\ndata: ${JSON.stringify({ action: 'setAudioOut', text: settings.audioOut })}\n\n`);
+  // trang nào thấy phiên bản server khác lần trước (vừa cập nhật xong) thì tự tải lại
+  res.write(`event: version\ndata: ${JSON.stringify({ version: VERSION })}\n\n`);
+  res.write(`event: audio\ndata: ${JSON.stringify(audioStatus())}\n\n`);
+  res.write(`event: update\ndata: ${JSON.stringify(updateStatus())}\n\n`);
   sseClients.push(res);
   const stageId = typeof req.query.stage === 'string' ? req.query.stage.slice(0, 40) : '';
   if (stageId) {
@@ -345,7 +356,7 @@ app.post('/api/tiktok/disconnect', (_req, res) => {
 });
 
 // ---------- Lệnh từ trang điều khiển (chỉ trang stage làm theo) ----------
-const CONTROL_ACTIONS = ['speak', 'setRate', 'reset', 'setName', 'custom'];
+const CONTROL_ACTIONS = ['speak', 'setRate', 'reset', 'setName', 'custom', 'setAudioOut', 'scanAudio'];
 app.post('/api/control', (req, res) => {
   const { action, text } = req.body || {};
   if (!CONTROL_ACTIONS.includes(action)) return res.status(400).json({ success: false, error: 'Lệnh không hợp lệ' });
@@ -361,6 +372,12 @@ app.post('/api/control', (req, res) => {
     payload.text = name;
     lastNameControl = { action, text: name };
     saveSettings({ channelName: name });
+  }
+  if (action === 'setAudioOut') {
+    // '' = loa mặc định của máy
+    payload.text = (typeof text === 'string' ? text : '').replace(/[\x00-\x1f\x7f]/g, '').trim().slice(0, 120);
+    saveSettings({ audioOut: payload.text });
+    broadcast('audio', audioStatus());
   }
   broadcast('control', payload);
   res.json({ success: true, pages: sseClients.length });
@@ -804,6 +821,156 @@ ${list(banned.map(([id, b]) => `<b>${esc(b.answer)}</b> · ${esc(b.clue)} <code>
 </body></html>`);
 });
 
+// ---------- Loa / VB-Cable của trang stage ----------
+// Trang stage (đang được phát tiếng) báo lên: máy có những thiết bị phát nào, đang phát ra đâu.
+// Trang điều khiển hiện danh sách để chọn; chọn xong gửi lệnh setAudioOut, lưu settings.json, mở lại vẫn nhớ.
+let stageAudio: { outs: string[]; sink: string; at: number } = { outs: [], sink: '', at: 0 };
+const audioStatus = () => ({ want: settings.audioOut || '', outs: stageAudio.outs, sink: stageAudio.sink, at: stageAudio.at, stages: stageIds.length });
+app.post('/api/audio/state', (req, res) => {
+  const b = req.body || {};
+  const clean = (x: unknown) => String(x ?? '').replace(/[\x00-\x1f\x7f]/g, '').slice(0, 120);
+  stageAudio = { outs: Array.isArray(b.outs) ? b.outs.slice(0, 40).map(clean).filter(Boolean) : [], sink: clean(b.sink), at: Date.now() };
+  broadcast('audio', audioStatus());
+  res.json({ success: true });
+});
+
+// Mở trang stage thành cửa sổ Edge riêng (chỉ Windows): không thanh địa chỉ, khổ 9:16 cao bằng màn hình,
+// tự phát tiếng không cần bấm, được quyền đọc tên loa (để chọn CABLE Input) mà không hiện hộp hỏi.
+// Dùng cách này thì trong LIVE Studio thêm nguồn "Window capture" chọn cửa sổ này, KHÔNG thêm nguồn Link nữa.
+const winStart = (...args: string[]) =>
+  spawn('cmd.exe', ['/d', '/s', '/c', `"start "" ${args.map((a) => `"${a}"`).join(' ')}"`], {
+    windowsVerbatimArguments: true,
+    windowsHide: true,
+    detached: true,
+    stdio: 'ignore',
+  }).unref();
+app.post('/api/open-stage', (_req, res) => {
+  if (process.platform !== 'win32') return res.json({ success: false, error: 'Chỉ mở tự động được trên Windows. Mở tay: http://localhost:' + PORT + '/?view=stage' });
+  const ps = 'Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea.Height';
+  execFile('powershell.exe', ['-NoProfile', '-Command', ps], { windowsHide: true, timeout: 8000 }, (_err, out) => {
+    const h = Math.max(480, Math.min(4000, parseInt(String(out), 10) || 960));
+    const w = Math.round((h * 9) / 16);
+    const profile = path.join(process.env.LOCALAPPDATA || os.tmpdir(), 'LopHocChu', 'edge-stage');
+    winStart('msedge', `--app=http://localhost:${PORT}/?view=stage`, `--user-data-dir=${profile}`, '--autoplay-policy=no-user-gesture-required',
+      // cấp quyền đọc tên loa không cần hỏi (trang stage chỉ đọc tên thiết bị, không thu âm)
+      '--use-fake-ui-for-media-stream',
+      '--no-first-run', '--disable-features=Translate', `--window-size=${w},${h}`, '--window-position=0,0');
+  });
+  res.json({ success: true });
+});
+
+// ---------- Cập nhật (bản Windows đóng gói) ----------
+// version.txt do pack/build-windows.sh ghi cạnh server.mjs; chạy từ mã nguồn thì không có -> 'dev', không tự cập nhật.
+// Bấm "Cập nhật ngay": tải zip mới nhất trên GitHub Releases, kiểm SHA-256, giải nén bằng PowerShell, chép đè
+// dist/, public/assets/, server.mjs, version.txt rồi thoát mã 42 để Mo-Lop-Hoc-Chu.bat bật server mới ngay.
+// Giữ nguyên: node/, file .bat (cmd đang đọc dở), data/ (sổ lớp), settings.json, nhạc nền trong public/assets/audio.
+const VERSION = (() => {
+  try {
+    return fs.readFileSync(path.join(__dirname, 'version.txt'), 'utf8').trim() || 'dev';
+  } catch {
+    return 'dev';
+  }
+})();
+const UPDATE_REPO = process.env.UPDATE_REPO || 'tobi1008/lop-hoc-chu';
+let latest: { version: string; url: string; sha256: string; notes: string } | null = null;
+let updating = false;
+let updateMsg = '';
+const isNewer = (a: string, b: string) => {
+  const n = (v: string) => String(v).replace(/^v/, '').split(/[.-]/).map((x) => +x || 0);
+  const x = n(a), y = n(b);
+  for (let i = 0; i < Math.max(x.length, y.length); i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0);
+  return false;
+};
+const updateStatus = () => ({
+  current: VERSION,
+  latest: latest?.version || null,
+  notes: latest?.notes || '',
+  available: !!latest && VERSION !== 'dev' && isNewer(latest.version, VERSION),
+  canInstall: process.platform === 'win32' && VERSION !== 'dev',
+  updating,
+  message: updateMsg,
+});
+const sendUpdate = (message?: string) => {
+  if (message !== undefined) updateMsg = message;
+  broadcast('update', updateStatus());
+};
+async function checkUpdate() {
+  sendUpdate('Đang kiểm tra…');
+  try {
+    const r = await fetch(`https://api.github.com/repos/${UPDATE_REPO}/releases/latest`, {
+      headers: { 'User-Agent': 'lop-hoc-chu-live', Accept: 'application/vnd.github+json' },
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!r.ok) throw new Error(r.status === 404 ? 'chưa có bản phát hành nào' : 'GitHub trả về ' + r.status);
+    const rel = (await r.json()) as { tag_name: string; body?: string; assets?: { name: string; browser_download_url: string; digest?: string }[] };
+    const asset = rel.assets?.find((a) => /windows-x64\.zip$/.test(a.name));
+    if (!asset) throw new Error('bản phát hành không có file zip Windows');
+    latest = {
+      version: rel.tag_name.replace(/^v/, ''),
+      url: asset.browser_download_url,
+      sha256: asset.digest?.replace(/^sha256:/, '') || '',
+      notes: String(rel.body || '').slice(0, 2000),
+    };
+    const st = updateStatus();
+    sendUpdate(st.available ? '' : VERSION === 'dev' ? 'Đang chạy từ mã nguồn: cập nhật bằng git pull' : 'Đang dùng bản mới nhất');
+  } catch (e) {
+    sendUpdate('Không kiểm tra được cập nhật: ' + (e instanceof Error ? e.message : e));
+  }
+}
+async function installUpdate() {
+  if (updating) return;
+  if (process.platform !== 'win32' || VERSION === 'dev') return sendUpdate('Chỉ tự cập nhật được trên bản Windows đóng gói');
+  if (!latest || !isNewer(latest.version, VERSION)) return sendUpdate('Đang dùng bản mới nhất');
+  updating = true;
+  sendUpdate(`Đang tải bản ${latest.version}…`);
+  console.log(`[cập nhật] Đang tải bản ${latest.version}`);
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'lophocchu-'));
+  try {
+    const r = await fetch(latest.url, { headers: { 'User-Agent': 'lop-hoc-chu-live' }, signal: AbortSignal.timeout(300_000) });
+    if (!r.ok) throw new Error('tải về lỗi ' + r.status);
+    const buf = Buffer.from(await r.arrayBuffer());
+    if (latest.sha256 && createHash('sha256').update(buf).digest('hex') !== latest.sha256) throw new Error('file tải về bị lỗi (SHA-256 không khớp)');
+    const zip = path.join(tmp, 'update.zip');
+    fs.writeFileSync(zip, buf);
+    sendUpdate('Đang giải nén…');
+    await new Promise<void>((ok, fail) =>
+      execFile(
+        'powershell.exe',
+        ['-NoProfile', '-Command', 'Expand-Archive -LiteralPath $env:LHC_ZIP -DestinationPath $env:LHC_OUT -Force'],
+        { windowsHide: true, timeout: 180_000, env: { ...process.env, LHC_ZIP: zip, LHC_OUT: path.join(tmp, 'x') } },
+        (e) => (e ? fail(new Error('giải nén lỗi: ' + e.message)) : ok()),
+      ),
+    );
+    const src = path.join(tmp, 'x', 'LopHocChu');
+    if (!fs.existsSync(path.join(src, 'server.mjs')) || !fs.existsSync(path.join(src, 'dist', 'index.html'))) throw new Error('file zip không đúng cấu trúc');
+    // dist: xoá bản cũ (tên file js có mã băm, không xoá thì rác dồn mãi)
+    fs.rmSync(path.join(__dirname, 'dist'), { recursive: true, force: true });
+    fs.cpSync(path.join(src, 'dist'), path.join(__dirname, 'dist'), { recursive: true, force: true });
+    fs.cpSync(path.join(src, 'public', 'assets'), path.join(__dirname, 'public', 'assets'), { recursive: true, force: true });
+    for (const f of ['server.mjs', 'version.txt', 'HUONG-DAN.txt', 'LICENSE.txt', 'THIRD-PARTY-LICENSES.txt'])
+      if (fs.existsSync(path.join(src, f))) fs.copyFileSync(path.join(src, f), path.join(__dirname, f));
+    writeSoLop();
+    sendUpdate(`Đã cập nhật lên bản ${latest.version}, đang khởi động lại…`);
+    console.log(`[cập nhật] Xong bản ${latest.version}, khởi động lại`);
+    setTimeout(() => process.exit(42), 500);
+  } catch (e) {
+    updating = false;
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error('[cập nhật] Thất bại:', msg);
+    sendUpdate('Cập nhật thất bại: ' + msg);
+  } finally {
+    fs.rm(tmp, { recursive: true, force: true }, () => {});
+  }
+}
+app.post('/api/update/check', (_req, res) => {
+  void checkUpdate();
+  res.json({ success: true });
+});
+app.post('/api/update/install', (_req, res) => {
+  void installUpdate();
+  res.json({ success: true });
+});
+
 // ---------- Khởi động ----------
 async function start() {
   if (process.env.NODE_ENV !== 'production') {
@@ -826,7 +993,8 @@ async function start() {
 
   // Chỉ nghe trên máy này: API không có đăng nhập, người cùng Wi-Fi không được điều khiển giọng đọc
   app.listen(PORT, '127.0.0.1', () => {
-    console.log(`Server chạy ở http://localhost:${PORT}  |  Link LIVE Studio: http://lvh.me:${PORT}/?view=stage`);
+    console.log(`Server chạy ở http://localhost:${PORT}  |  Link LIVE Studio: http://lvh.me:${PORT}/?view=stage  |  Phiên bản ${VERSION}`);
+    if (VERSION !== 'dev') setTimeout(() => void checkUpdate(), 5000);
     // lần trước đang kết nối mà server bị tắt / bật lại: tự kết nối lại tài khoản đó
     if (wantUser && !process.env.DATA_DIR) {
       console.log(`[TikTok] Tự kết nối lại @${wantUser} (lần trước đang kết nối)`);

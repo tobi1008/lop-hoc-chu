@@ -24,6 +24,12 @@ start "" cmd /c "timeout /t 3 >nul & start http://localhost:3006"
 rem Treo live ca ngay: server tat (loi, het bo nho...) thi tu bat lai sau 5 giay; trang stage tu noi lai, khong mat diem.
 :run
 "%~dp0node\node.exe" "%~dp0server.mjs"
+rem ma 42 = vua cai ban cap nhat tu trang dieu khien: bat server moi ngay (trang dang mo tu tai lai)
+if %ERRORLEVEL%==42 (
+  echo.
+  echo   Da cap nhat xong, dang khoi dong lai...
+  goto run
+)
 echo.
 echo   [%date% %time%] Server bi tat, tu bat lai sau 5 giay... (dong cua so nay de tat han)
 timeout /t 5 >nul

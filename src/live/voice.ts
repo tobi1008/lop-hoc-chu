@@ -1,4 +1,5 @@
 import { IS_STAGE } from './page';
+import { audioOut } from './audioOut';
 import { containsBanned } from './bannedWords';
 
 /**
@@ -124,6 +125,8 @@ class Voice {
         const audio = new Audio(this.urlOf(part));
         audio.volume = this.volume;
         this.current = audio;
+        await audioOut.el(audio); // VB-Cable / loa chủ kênh chọn ở trang điều khiển
+        if (this.current !== audio) break; // stop() lúc đang đổi thiết bị
         await new Promise<void>((resolve) => {
           // Tự gỡ kẹt: 1 câu treo (không tải xong, không báo lỗi) sẽ làm MC im cả buổi live.
           // Chưa phát được sau 8 giây thì bỏ câu; đang phát thì cắt khi quá độ dài câu + 4 giây.

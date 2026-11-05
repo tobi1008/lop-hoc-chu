@@ -1,4 +1,5 @@
 import type { StageView } from './useGame';
+import { audioOut } from '../live/audioOut';
 
 /**
  * Hiệu ứng âm thanh, chỉ phát ở trang stage. Mặc định trình duyệt tự tạo tiếng (không cần file, không lo bản quyền).
@@ -56,7 +57,7 @@ class Sfx {
     this.musicOut = null;
     if (!track) return;
     try {
-      this.ctx ??= new AudioContext();
+      this.ctx ??= audioOut.ctx(new AudioContext());
       if (this.ctx.state === 'suspended') void this.ctx.resume();
       const out = this.ctx.createGain();
       out.gain.value = 0.0001;
@@ -105,11 +106,11 @@ class Sfx {
     if (file) {
       const a = file.cloneNode() as HTMLAudioElement;
       a.volume = Math.min(1, this.volume * 2);
-      void a.play().catch(() => {});
+      void audioOut.el(a).then(() => a.play()).catch(() => {});
       return;
     }
     try {
-      this.ctx ??= new AudioContext();
+      this.ctx ??= audioOut.ctx(new AudioContext());
       if (this.ctx.state === 'suspended') void this.ctx.resume();
       SYNTH[name](this.ctx, this.volume);
     } catch {

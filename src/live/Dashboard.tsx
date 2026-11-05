@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import type { LiveStatus } from './types';
 import { emitTest, sendControl } from './page';
 
@@ -135,7 +135,11 @@ export function Dashboard({
             </div>
           </Card>
 
+          <AudioCard />
+
           {extra}
+
+          <UpdateCard />
 
           <details className="rounded-2xl bg-slate-900 p-3 ring-1 ring-slate-800">
             <summary className="cursor-pointer font-semibold">Giả lập chung (người vào, follow, combo quà...)</summary>
@@ -253,5 +257,131 @@ function RateSlider() {
       <input type="range" min={0.8} max={1.5} step={0.05} value={rate} onChange={(e) => change(Number(e.target.value))} className="w-28 accent-amber-500" />
       <b className="w-10 text-slate-200">{rate.toFixed(2)}×</b>
     </label>
+  );
+}
+
+// Nghe 1 loại sự kiện từ server (kết nối riêng, tự nối lại khi server khởi động lại)
+function useServerEvent<T>(name: string) {
+  const [data, setData] = useState<T | null>(null);
+  useEffect(() => {
+    let src: EventSource | null = null;
+    let retry: ReturnType<typeof setTimeout> | undefined;
+    let closed = false;
+    const connect = () => {
+      src = new EventSource('/api/tiktok/events');
+      src.addEventListener(name, (e) => {
+        try {
+          setData(JSON.parse((e as MessageEvent).data));
+        } catch {
+          // bỏ qua
+        }
+      });
+      src.onerror = () => {
+        src?.close();
+        if (!closed) retry = setTimeout(connect, 3000);
+      };
+    };
+    connect();
+    return () => {
+      closed = true;
+      clearTimeout(retry);
+      src?.close();
+    };
+  }, [name]);
+  return data;
+}
+
+const post = (url: string) => fetch(url, { method: 'POST' }).then((r) => r.json()).catch(() => ({ success: false, error: 'Không gọi được server' }));
+
+// Loa / VB-Cable: chọn nơi trang stage phát tiếng (giống game Chánh Điện)
+function AudioCard() {
+  const a = useServerEvent<{ want: string; outs: string[]; sink: string; at: number; stages: number }>('audio');
+  const [msg, setMsg] = useState('');
+  const want = a?.want || '';
+  // thiết bị đã lưu vẫn nằm trong danh sách dù stage chưa thấy (vd chưa cắm cáp ảo)
+  const names = [...new Set([...(a?.outs || []), ...(want ? [want] : [])])];
+  const hasCable = names.some((n) => /cable input/i.test(n));
+  const choose = (v: string) => void sendControl('setAudioOut', v);
+  const openStage = async () => {
+    const r = await post('/api/open-stage');
+    setMsg(r.success ? 'Đã mở cửa sổ stage (Edge). Trong LIVE Studio thêm nguồn "Window capture" chọn cửa sổ đó.' : r.error);
+  };
+  const scan = () => {
+    void sendControl('scanAudio');
+    setMsg('Đang tìm thiết bị trên trang stage…');
+  };
+  let info: ReactNode;
+  if (!a?.stages) info = <>Chưa mở trang stage nào. Mở stage trước rồi chọn loa.</>;
+  else if (want && a.sink === want) info = <span className="text-emerald-400">✅ Stage đang phát ra “{a.sink}”. Trong LIVE Studio: tắt âm thanh máy tính, chỉ giữ mic <b>CABLE Output</b>.</span>;
+  else if (want) info = <span className="text-amber-300">⚠️ Stage chưa phát ra “{want}” được (chưa thấy thiết bị này). Dùng cửa sổ stage mở bằng nút bên dưới, cài VB-Cable rồi bấm Tìm thiết bị.</span>;
+  else info = <>Đang phát ra loa mặc định của máy.</>;
+  return (
+    <Card title="Âm thanh stage (VB-Cable)">
+      <div className="flex flex-wrap items-center gap-2 text-xs">
+        <label className="flex min-w-0 flex-1 items-center gap-1.5 text-slate-400">
+          Phát tiếng ra
+          <select className="min-w-0 flex-1 rounded-lg bg-slate-800 px-2 py-1.5 text-slate-100" value={want} onChange={(e) => choose(e.target.value)}>
+            <option value="">Loa mặc định của máy</option>
+            {names.map((n) => (
+              <option key={n} value={n}>
+                {n}
+              </option>
+            ))}
+          </select>
+        </label>
+        <Btn tone="ghost" onClick={scan}>
+          🔎 Tìm thiết bị
+        </Btn>
+        <Btn tone="ghost" onClick={openStage}>
+          🪟 Mở cửa sổ stage (Edge)
+        </Btn>
+      </div>
+      <p className="mt-2 text-xs text-slate-400">{info}</p>
+      {msg && <p className="mt-1 text-xs text-amber-300">{msg}</p>}
+      <p className="mt-1 text-xs text-slate-500">
+        Chọn <b>CABLE Input</b> để LIVE Studio chỉ thu tiếng lớp học (xem video khác không lọt vào live). Cách dùng: bấm “Mở cửa sổ stage (Edge)”, trong LIVE Studio thêm{' '}
+        <b>Window capture</b> chọn cửa sổ đó và mic <b>CABLE Output</b>, tắt âm thanh máy tính, bỏ nguồn Link cũ (2 stage = 2 giọng cô).
+        {!hasCable && a?.outs?.length ? ' Chưa thấy VB-Cable: tải miễn phí ở vb-audio.com/Cable, cài xong khởi động lại máy.' : ''}
+      </p>
+    </Card>
+  );
+}
+
+// Kiểm tra và cài bản mới ngay trong trang điều khiển (bản Windows đóng gói)
+function UpdateCard() {
+  const u = useServerEvent<{ current: string; latest: string | null; notes: string; available: boolean; canInstall: boolean; updating: boolean; message: string }>('update');
+  const [sure, setSure] = useState(false);
+  useEffect(() => {
+    if (!sure) return;
+    const t = setTimeout(() => setSure(false), 6000);
+    return () => clearTimeout(t);
+  }, [sure]);
+  const install = () => {
+    if (!sure) return setSure(true); // bấm 2 lần cho chắc, không dùng hộp thoại confirm
+    setSure(false);
+    void post('/api/update/install');
+  };
+  return (
+    <Card title="Cập nhật">
+      <div className="flex flex-wrap items-center gap-2 text-xs">
+        <span className="text-slate-400">
+          Đang dùng <b className="text-slate-200">{u?.current === 'dev' ? 'mã nguồn (dev)' : u?.current || '…'}</b>
+          {u?.latest && <> · mới nhất trên GitHub <b className="text-slate-200">{u.latest}</b></>}
+        </span>
+        <span className="flex-1" />
+        <Btn tone="ghost" onClick={() => void post('/api/update/check')} disabled={u?.updating}>
+          🔄 Kiểm tra cập nhật
+        </Btn>
+        {u?.available && u.canInstall && (
+          <Btn tone={sure ? 'danger' : 'primary'} onClick={install} disabled={u.updating}>
+            {u.updating ? 'Đang cập nhật…' : sure ? 'Bấm lần nữa để cài' : `⬇️ Cập nhật lên ${u.latest}`}
+          </Btn>
+        )}
+      </div>
+      {u?.available && !u.canInstall && <p className="mt-2 text-xs text-amber-300">Có bản mới nhưng bản này không tự cập nhật được: tải zip mới trên GitHub.</p>}
+      {u?.message && <p className="mt-2 text-xs text-amber-300">{u.message}</p>}
+      {u?.available && <p className="mt-1 text-xs text-slate-500">Cài xong game tự khởi động lại vài giây, sổ lớp và cài đặt giữ nguyên, tự kết nối lại TikTok. Nên cập nhật lúc không live (tiết đang học sẽ bắt đầu lại).</p>}
+      {u?.available && u.notes && <pre className="mt-2 max-h-32 overflow-auto whitespace-pre-wrap rounded-lg bg-slate-800 p-2 text-[11px] text-slate-300">{u.notes}</pre>}
+    </Card>
   );
 }

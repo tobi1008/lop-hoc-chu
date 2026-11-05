@@ -2,6 +2,18 @@ import { useEffect, useRef } from 'react';
 import type { LiveHandlers } from './types';
 import { IS_STAGE, STAGE_ID } from './page';
 import { voice } from './voice';
+import { audioOut } from './audioOut';
+
+// Trang stage báo trang điều khiển: có những loa nào, đang phát ra đâu. Chỉ trang stage đang được phát tiếng mới báo.
+const reportAudio = () => {
+  if (!IS_STAGE || !voice.enabled) return;
+  void fetch('/api/audio/state', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ outs: audioOut.names, sink: audioOut.sink, want: audioOut.want }),
+  }).catch(() => {});
+};
+if (IS_STAGE) audioOut.listen(reportAudio);
 
 /**
  * Nghe sự kiện live từ server. Handler luôn là bản mới nhất (không lo state cũ),
@@ -15,6 +27,7 @@ export function useLiveEvents(handlers: LiveHandlers) {
     let source: EventSource | null = null;
     let retry: ReturnType<typeof setTimeout> | undefined;
     let closed = false;
+    let seenVersion = '';
 
     const on = (name: string, fn: (data: any) => void) =>
       source!.addEventListener(name, (e) => {
@@ -35,14 +48,24 @@ export function useLiveEvents(handlers: LiveHandlers) {
       on('share', (d) => ref.current.onShare?.(d));
       on('like', (d) => ref.current.onLike?.(d));
       on('roomUser', (d) => ref.current.onViewers?.(d.viewerCount));
-      on('control', (d) => ref.current.onControl?.(d));
+      on('control', (d) => {
+        if (IS_STAGE && d.action === 'setAudioOut') void audioOut.set(d.text || '');
+        if (IS_STAGE && d.action === 'scanAudio') void audioOut.scan(true).then(reportAudio);
+        ref.current.onControl?.(d);
+      });
       on('gamestate', (d) => ref.current.onGameState?.(d));
+      // server vừa cập nhật lên bản khác: tải lại trang để chạy code mới
+      on('version', (d) => {
+        if (seenVersion && d.version && d.version !== seenVersion) window.location.reload();
+        seenVersion = d.version || seenVersion;
+      });
       on('speaker', (d) => {
         // trang stage bị trang mới hơn thay chỗ: im lặng hẳn (cả giọng lẫn nhạc)
         if (IS_STAGE) {
           const mine = d.id === STAGE_ID;
           if (!mine && voice.enabled) voice.stop();
           voice.enabled = mine;
+          if (mine) reportAudio();
         }
         ref.current.onSpeaker?.(d);
       });
