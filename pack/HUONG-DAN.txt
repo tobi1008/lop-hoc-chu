@@ -1,0 +1,56 @@
+LỚP HỌC CHỮ · BỘ LIVE CHO WINDOWS 10/11
+=======================================
+
+Không cần cài gì thêm. Node.js đã có sẵn trong thư mục "node".
+Máy cần có Internet (giọng đọc của cô lấy từ Microsoft Edge).
+
+
+1. CÀI LẦN ĐẦU
+--------------
+  • Chuột phải file zip → Properties → tích "Unblock" → OK (bỏ qua bước này Windows có thể chặn file .bat).
+  • Chuột phải file zip → Extract All… → giải nén vào Desktop hoặc Documents.
+    KHÔNG giải nén vào "C:\Program Files" (ở đó không lưu được sổ lớp và cài đặt).
+  • Muốn có biểu tượng ngoài màn hình: chuột phải "Mo-Lop-Hoc-Chu.bat" → Send to → Desktop (create shortcut).
+  • Nhạc nền (không bắt buộc): bỏ file nhạc vào thư mục public\assets\audio.
+
+
+2. MỖI LẦN LIVE
+---------------
+  1) Bấm đúp "Mo-Lop-Hoc-Chu.bat".
+     Một cửa sổ đen hiện ra (đó là server), vài giây sau trang điều khiển tự mở: http://localhost:3006
+     → KHÔNG đóng cửa sổ đen trong lúc live. Server lỡ bị tắt thì tự bật lại sau 5 giây.
+     → Nếu Windows hiện "Windows protected your PC": bấm "More info" → "Run anyway".
+     → Nếu tường lửa hỏi quyền cho node.exe: bấm "Cancel" cũng được, game chỉ chạy trong máy.
+
+  2) Mở TikTok LIVE Studio, bấm Phát trực tiếp (Go LIVE).
+
+  3) Trang điều khiển: nhập username TikTok (không cần @) → "Kết nối".
+     Báo "chưa LIVE" nghĩa là tài khoản chưa phát trực tiếp. Lần sau mở game sẽ tự kết nối.
+
+  4) Đưa lớp học vào LIVE Studio (làm 1 lần, lần sau giữ nguyên):
+       Thêm nguồn "Link" → đường dẫn  http://lvh.me:3006/?view=stage
+       Bật "Turn on sound" (để có giọng cô).
+       Bật "Custom resolution" → 1620 × 2880 (chữ nét hơn; 1080 × 1920 cũng được) → Apply → bấm "vừa màn hình".
+     LIVE Studio không nhận chữ "localhost"; lvh.me trỏ về chính máy mình nên dùng được.
+     Chỉ mở trang ?view=stage ở MỘT chỗ (LIVE Studio), mở thêm sẽ nghe hai giọng cô đè nhau.
+     Dùng OBS: thêm nguồn Browser, cùng đường dẫn và khổ trên.
+
+  5) Kết thúc: bấm "👋 Chào tạm biệt (xuống live)" ở trang điều khiển, rồi tắt live.
+     Xem lại buổi live: nút "📊 Báo cáo" hoặc http://localhost:3006/bao-cao
+
+
+3. THỬ TRƯỚC KHI LIVE
+---------------------
+  Trang điều khiển có các nút giả lập (1 bạn trả lời đúng, tặng hoa, 1000 người cùng đoán…) để xem game chạy.
+
+
+4. GẶP LỖI
+----------
+  • Cổng 3006 đang được dùng: Lớp Học Chữ đã mở ở một cửa sổ đen khác. Dùng cửa sổ đó, hoặc đóng nó rồi mở lại.
+  • Trang điều khiển không tự mở: mở trình duyệt, gõ  http://localhost:3006
+  • Cô không nói: kiểm tra Internet, và đã bật "Turn on sound" trong LIVE Studio chưa.
+  • Màn hình lớp học trắng hoặc đứng hình: trong LIVE Studio bấm làm mới nguồn Link.
+
+
+Sổ lớp (điểm, bảng vàng tuần, báo cáo) và cài đặt lưu trong thư mục "data" và file "settings.json" cạnh file .bat.
+Muốn sang bản mới mà giữ sổ lớp: chép thư mục "data" và file "settings.json" sang thư mục bản mới.

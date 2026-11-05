@@ -1,0 +1,39 @@
+# Push to main that touches the game → build the Windows zip and publish a GitHub Release (pack/release.sh).
+name: Release Windows
+
+on:
+  push:
+    branches: [main]
+    paths: ['src/**', 'public/**', 'server.ts', 'index.html', 'package.json', 'package-lock.json', 'vite.config.ts', 'pack/**', '.github/workflows/release.yml']
+  workflow_dispatch:
+    inputs:
+      notes:
+        description: 'Ghi chú phát hành (bỏ trống = danh sách commit)'
+        required: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      TZ: Asia/Ho_Chi_Minh          # version = local date+time
+      GH_TOKEN: ${{ github.token }}
+      UPDATE_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0            # release notes = commits since the previous release tag
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Build and publish
+        env:
+          NOTES: ${{ inputs.notes }}
+        run: |
+          if [ -n "$NOTES" ]; then bash pack/release.sh "$NOTES"; else bash pack/release.sh; fi
