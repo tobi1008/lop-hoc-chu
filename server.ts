@@ -824,12 +824,12 @@ ${list(banned.map(([id, b]) => `<b>${esc(b.answer)}</b> · ${esc(b.clue)} <code>
 // ---------- Loa / VB-Cable của trang stage ----------
 // Trang stage (đang được phát tiếng) báo lên: máy có những thiết bị phát nào, đang phát ra đâu.
 // Trang điều khiển hiện danh sách để chọn; chọn xong gửi lệnh setAudioOut, lưu settings.json, mở lại vẫn nhớ.
-let stageAudio: { outs: string[]; sink: string; at: number } = { outs: [], sink: '', at: 0 };
-const audioStatus = () => ({ want: settings.audioOut || '', outs: stageAudio.outs, sink: stageAudio.sink, at: stageAudio.at, stages: stageIds.length });
+let stageAudio: { outs: string[]; sink: string; at: number; secure: boolean; host: string } = { outs: [], sink: '', at: 0, secure: true, host: '' };
+const audioStatus = () => ({ want: settings.audioOut || '', outs: stageAudio.outs, sink: stageAudio.sink, at: stageAudio.at, secure: stageAudio.secure, host: stageAudio.host, stages: stageIds.length });
 app.post('/api/audio/state', (req, res) => {
   const b = req.body || {};
   const clean = (x: unknown) => String(x ?? '').replace(/[\x00-\x1f\x7f]/g, '').slice(0, 120);
-  stageAudio = { outs: Array.isArray(b.outs) ? b.outs.slice(0, 40).map(clean).filter(Boolean) : [], sink: clean(b.sink), at: Date.now() };
+  stageAudio = { outs: Array.isArray(b.outs) ? b.outs.slice(0, 40).map(clean).filter(Boolean) : [], sink: clean(b.sink), at: Date.now(), secure: b.secure !== false, host: clean(b.host).slice(0, 60) };
   broadcast('audio', audioStatus());
   res.json({ success: true });
 });

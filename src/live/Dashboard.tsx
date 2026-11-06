@@ -295,7 +295,7 @@ const post = (url: string) => fetch(url, { method: 'POST' }).then((r) => r.json(
 
 // Loa / VB-Cable: chọn nơi trang stage phát tiếng (giống game Chánh Điện)
 function AudioCard() {
-  const a = useServerEvent<{ want: string; outs: string[]; sink: string; at: number; stages: number }>('audio');
+  const a = useServerEvent<{ want: string; outs: string[]; sink: string; at: number; secure?: boolean; host?: string; stages: number }>('audio');
   const [msg, setMsg] = useState('');
   const want = a?.want || '';
   // thiết bị đã lưu vẫn nằm trong danh sách dù stage chưa thấy (vd chưa cắm cáp ảo)
@@ -312,6 +312,13 @@ function AudioCard() {
   };
   let info: ReactNode;
   if (!a?.stages) info = <>Chưa mở trang stage nào. Mở stage trước rồi chọn loa.</>;
+  else if (a.secure === false)
+    info = (
+      <span className="text-amber-300">
+        ⚠️ Trang stage đang phát tiếng mở bằng “{a.host || 'lvh.me'}” (nguồn Link của LIVE Studio): trình duyệt không cho trang này thấy hay đổi loa, nên không tìm được VB-Cable. Bấm
+        “Mở cửa sổ stage (Edge)” (mở bằng localhost), trong LIVE Studio thay nguồn Link bằng <b>Window capture</b> chọn cửa sổ đó, rồi bấm Tìm thiết bị.
+      </span>
+    );
   else if (want && a.sink === want) info = <span className="text-emerald-400">✅ Stage đang phát ra “{a.sink}”. Trong LIVE Studio: tắt âm thanh máy tính, chỉ giữ mic <b>CABLE Output</b>.</span>;
   else if (want) info = <span className="text-amber-300">⚠️ Stage chưa phát ra “{want}” được (chưa thấy thiết bị này). Dùng cửa sổ stage mở bằng nút bên dưới, cài VB-Cable rồi bấm Tìm thiết bị.</span>;
   else info = <>Đang phát ra loa mặc định của máy.</>;

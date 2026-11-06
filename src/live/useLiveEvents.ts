@@ -10,7 +10,7 @@ const reportAudio = () => {
   void fetch('/api/audio/state', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ outs: audioOut.names, sink: audioOut.sink, want: audioOut.want }),
+    body: JSON.stringify({ outs: audioOut.names, sink: audioOut.sink, want: audioOut.want, secure: audioOut.secure, host: location.host }),
   }).catch(() => {});
 };
 if (IS_STAGE) audioOut.listen(reportAudio);

@@ -83,6 +83,8 @@ Dùng OBS cũng được: thêm nguồn **Browser**, cùng đường dẫn và k
 2. Trang điều khiển → khung **Âm thanh stage (VB-Cable)** → bấm **🪟 Mở cửa sổ stage (Edge)**: lớp học mở thành cửa sổ Edge riêng khổ 9:16, tự phát tiếng.
 3. Ô **Phát tiếng ra** chọn **CABLE Input** (chưa thấy thì bấm **🔎 Tìm thiết bị**). Dòng bên dưới báo ✅ là được.
 4. Trong LIVE Studio: thêm nguồn **Window capture** chọn cửa sổ đó, thêm mic **CABLE Output**, tắt âm thanh máy tính. Bỏ nguồn Link cũ (2 trang stage cùng mở là 2 giọng cô).
+
+Nguồn Link `lvh.me` không chọn được VB-Cable: trình duyệt chỉ cho đọc / đổi loa ở trang mở bằng `localhost`. Stage mở bằng Link thì trang điều khiển báo ⚠️, phải dùng cửa sổ Edge ở bước 2.
 Thiết bị đã chọn được lưu trong `settings.json`, lần sau mở lại vẫn nhớ.
 
 ## Trang điều khiển

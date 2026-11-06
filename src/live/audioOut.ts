@@ -14,6 +14,9 @@ class AudioOut {
   want = '';
   /** tên thiết bị đang phát thật ('' = mặc định) */
   sink = '';
+  /** false: trang mở bằng địa chỉ không an toàn (vd http://lvh.me, nguồn Link của LIVE Studio), trình duyệt giấu hẳn
+   *  danh sách loa và không cho đổi loa. Chỉ http://localhost / 127.0.0.1 (hoặc https) mới chọn được VB-Cable. */
+  readonly secure = typeof window !== 'undefined' && window.isSecureContext && !!navigator.mediaDevices?.enumerateDevices;
   private outs: MediaDeviceInfo[] = [];
   private scanned = false;
   private ctxs = new Set<AudioContext>();
@@ -33,7 +36,7 @@ class AudioOut {
   /** Lấy danh sách loa / thiết bị phát. askPermission: được mở micro 1 lần để đọc tên thiết bị */
   async scan(askPermission: boolean) {
     const md = navigator.mediaDevices;
-    if (!md?.enumerateDevices) return;
+    if (!md?.enumerateDevices) return this.onChange?.(); // vẫn báo lên để trang điều khiển nói rõ lý do
     const named = async () => (await md.enumerateDevices()).filter((d) => d.kind === 'audiooutput' && d.label);
     try {
       let list = await named();
